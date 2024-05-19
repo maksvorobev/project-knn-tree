@@ -12,6 +12,13 @@ enum TYPE {
     B = 1,
 };
 
+template <typename T, typename Y>
+std::ostream & operator<<(std::ostream & out, const std::pair<T, Y> & pair) {
+    
+        out << pair.first << " " << pair.second;
+    return out;
+}
+
 template <typename T>
 std::ostream & operator<<(std::ostream & out, const std::vector<T> & vec) {
     for (const auto & elem : vec) {
