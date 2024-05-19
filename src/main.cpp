@@ -1,75 +1,85 @@
 #include <iostream>
 #include <knncpp.h>
 
+#include "mainWorkFLow.hpp"
+#include "mpiFlow.hpp"
+
 typedef Eigen::MatrixXd Matrix;
 typedef knncpp::Matrixi Matrixi;
 
-int main()
-{
-    // Define some data points, which should be searched.
-    // Each column defines one datapoint.
-    Matrix dataPoints(3, 9);
-    dataPoints << 1, 2, 3, 1, 2, 3, 1, 2, 3,
-                  2, 1, 0, 3, 2, 1, 0, 3, 4,
-                  3, 1, 3, 1, 3, 4, 4, 2, 1;
 
-    // Create a KDTreeMinkowski object and set the data points.
-    // Data is not copied by default. You can also pass an additional bool flag
-    // to create a data copy. The tree is not built yet.
-    // You can also use the setData() method to set the data at a later point.
-    // The distance type is defined by the second template parameter.
-    // Currently ManhattenDistance, EuclideanDistance, ChebyshevDistance and
-    // MinkowskiDistance are available.
+int main(int argc, char* argv[])
+{
+
+
+    MainWorkFlow f;
+    auto x = f.makeVectors("data_file");
+    
+    auto map = x.second;
+    auto data = splitOnToTestAndTeaching(0.7, x.first);
+
+    auto& teaching = data.first;
+    auto& work = data.second;
+    //std::cout << data.first.size() << '\n';
+
+    //std::cout << data.second.size() << '\n';
+
+    Matrix dataPoints(teaching[0].size(), teaching.size());
+
+    for (int i = 0; i < teaching[0].size(); ++i){
+
+        for (int j = 0; j < teaching.size(); ++j){
+            dataPoints(i, j) = teaching[i][j];
+        }
+    }
+
     knncpp::KDTreeMinkowskiX<double, knncpp::EuclideanDistance<double>> kdtree(dataPoints);
 
-    // Set the bucket size for each leaf node in the tree. The higher the value
-    // the less leafs have to be visited to find the nearest neighbors. The
-    // lower the value the less distance evaluations have to be computed.
-    // Default is 16.
-    kdtree.setBucketSize(16);
-    // Set if the resulting neighbors should be sorted in ascending order after
-    // a successfull search.
-    // This consumes some time during the query.
-    // Default is true.
-    kdtree.setSorted(true);
-    // Set if the root should be taken of the distances after a successful search.
-    // This consumes some time during the query.
-    // Default is false.
-    kdtree.setTakeRoot(true);
-    // Set the maximum inclusive distance for the query. Set to 0 or negative
-    // to disable maximum distances.
-    // Default is 0.
-    kdtree.setMaxDistance(2.5 * 2.5);
-    // Set how many threads should be used during the query. Set to 0 or
-    // negative to autodetect the optimal number of threads (OpenMP only).
-    // Default is 1.
-    kdtree.setThreads(2);
+    kdtree.setThreads(1);
 
-    // Build the tree. This consumes some time.
     kdtree.build();
 
-    // Create a querypoint. We will search for this points nearest neighbors.
-    Matrix queryPoints(3, 1);
-    queryPoints << 0, 1, 0;
 
+    Matrix queryPoints(work[0].size(), 1);
+
+    for (int i = 0; i < work[0].size(); ++i){
+        queryPoints(i, 0) = work[i][0];
+    }
+    
     Matrixi indices;
     Matrix distances;
-    // Search for 3 nearest neighbors.
-    // The matrices indices and distances hold the index and distance of the
-    // respective nearest neighbors.
-    // Their value is set to -1 if no further neighbor was found.
-    kdtree.query(queryPoints, 3, indices, distances);
 
-    // Do something with the results.
-    std::cout
-        << "Data points:" << std::endl
-        << dataPoints << std::endl
-        << "Query points:" << std::endl
-        << queryPoints << std::endl
-        << "Neighbor indices:" << std::endl
-        << indices << std::endl
-        << "Neighbor distances:" << std::endl
+    kdtree.query(queryPoints, 10, indices, distances);
+
+
+    //std::cout \
+        << "Query points:" << std::endl \
+        << queryPoints << std::endl \
+        << "Neighbor indices:" << std::endl \
+        << indices << std::endl \
+        << "Neighbor distances:" << std::endl \
         << distances << std::endl;
 
+    
+    int a = 0;
+    int b = 0;
+
+    for (int i = 0; i < indices.size(); ++i){
+        auto vec = teaching[indices(i)];
+        if (map.count(vec) == 0){
+            //assert(false);
+        }
+        else {
+            if (map[vec] == 0) ++a;
+            else ++b;
+        }
+    }
+
+    //std::cout << "intit  = " << map[work[0]] << ' ' << a << ' ' << b << '\n';
+
+
+    MpiFlow flow;
+    flow.init(argc, argv);
+    flow.start();
     return 0;
 }
